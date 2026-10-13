@@ -2,9 +2,34 @@ from fastmcp import FastMCP
 from datetime import datetime
 import os
 import sqlite3
+import tempfile
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "expenses.db")
+
+
+def _pick_db_path() -> str:
+    """Choose a folder the server can write to.
+
+    1. EXPENSES_DB_PATH, if you set it (for example a persistent disk)
+    2. The folder next to this file (works on your own PC)
+    3. The system temp folder (works when the deployed code folder is read-only)
+    """
+    env_path = os.environ.get("EXPENSES_DB_PATH")
+    if env_path:
+        return env_path
+    for folder in (BASE_DIR, tempfile.gettempdir()):
+        probe = os.path.join(folder, ".write_test")
+        try:
+            with open(probe, "w") as f:
+                f.write("ok")
+            os.remove(probe)
+            return os.path.join(folder, "expenses.db")
+        except OSError:
+            continue
+    return os.path.join(tempfile.gettempdir(), "expenses.db")
+
+
+DB_PATH = _pick_db_path()
 CATEGORIES_PATH = os.path.join(BASE_DIR, "categories.json")
 
 mcp = FastMCP("ExpenseTracker")
